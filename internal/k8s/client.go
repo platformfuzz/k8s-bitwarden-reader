@@ -49,10 +49,15 @@ func buildKubeconfig() (*rest.Config, error) {
 // NewK8sClient creates Kubernetes clients with in-cluster config or kubeconfig fallback
 // Returns (nil, nil) if no Kubernetes config is found (standalone mode)
 func NewK8sClient() (*K8sClients, error) {
+	var config *rest.Config
+	var err error
+	var isInCluster bool
+
 	// Try in-cluster config first (when running inside a Kubernetes cluster)
-	config, err := rest.InClusterConfig()
+	config, err = rest.InClusterConfig()
 	if err != nil {
 		// Fallback to kubeconfig for local development
+		isInCluster = false
 		config, err = buildKubeconfig()
 		if err != nil {
 			return nil, err
@@ -61,19 +66,24 @@ func NewK8sClient() (*K8sClients, error) {
 			// No Kubernetes config found - return nil for standalone mode
 			return nil, nil
 		}
+	} else {
+		isInCluster = true
 	}
 
 	// Create clientset
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}
 
 	// Create dynamic client
 	dynamicClient, err := dynamic.NewForConfig(config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create dynamic client: %w", err)
 	}
+
+	// Log successful client creation
+	fmt.Printf("Successfully initialized Kubernetes clients (in-cluster: %v)\n", isInCluster)
 
 	return &K8sClients{
 		Clientset:    clientset,
