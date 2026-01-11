@@ -129,14 +129,7 @@ func GetBitwardenSecretCRD(ctx context.Context, name, namespace string, dynamicC
 	// Try namespace-scoped access first
 	unstructuredObj, err := dynamicClient.Resource(BitwardenSecretGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil {
-		// Success with namespace-scoped access
-		info.CRDFound = true
-		extractMetadata(unstructuredObj, info)
-		extractStatusFields(unstructuredObj, info)
-		extractConditions(unstructuredObj, info)
-		log.Printf("Successfully read CRD %s/%s: CRDFound=%v, LastSync=%s, Status=%s",
-			BitwardenSecretGVR.Group, name, info.CRDFound, info.LastSuccessfulSync, info.SyncStatus)
-		return info, nil
+		return extractCRDInfo(unstructuredObj, name, namespace, "namespace-scoped"), nil
 	}
 
 	// Log the full error details
@@ -151,14 +144,7 @@ func GetBitwardenSecretCRD(ctx context.Context, name, namespace string, dynamicC
 		// Try cluster-scoped access
 		unstructuredObj, err = dynamicClient.Resource(BitwardenSecretGVR).Get(ctx, name, metav1.GetOptions{})
 		if err == nil {
-			log.Printf("Successfully found CRD %s/%s using cluster-scoped access", BitwardenSecretGVR.Group, name)
-			info.CRDFound = true
-			extractMetadata(unstructuredObj, info)
-			extractStatusFields(unstructuredObj, info)
-			extractConditions(unstructuredObj, info)
-			log.Printf("Successfully read CRD %s/%s: CRDFound=%v, LastSync=%s, Status=%s",
-				BitwardenSecretGVR.Group, name, info.CRDFound, info.LastSuccessfulSync, info.SyncStatus)
-			return info, nil
+			return extractCRDInfo(unstructuredObj, name, namespace, "cluster-scoped"), nil
 		}
 
 		// Cluster-scoped also failed
@@ -204,6 +190,19 @@ func GetBitwardenSecretCRD(ctx context.Context, name, namespace string, dynamicC
 	return info, nil // Return info with error message, not an error
 }
 
+// extractCRDInfo extracts all information from a CRD unstructured object
+func extractCRDInfo(unstructuredObj *unstructured.Unstructured, name, namespace, scope string) *CRDInfo {
+	info := &CRDInfo{
+		CRDFound: true,
+	}
+	extractMetadata(unstructuredObj, info)
+	extractStatusFields(unstructuredObj, info)
+	extractConditions(unstructuredObj, info)
+	log.Printf("Successfully read CRD %s/%s (%s): CRDFound=%v, LastSync=%s, Status=%s",
+		BitwardenSecretGVR.Group, name, scope, info.CRDFound, info.LastSuccessfulSync, info.SyncStatus)
+	return info
+}
+
 // PatchCRDAnnotation patches the BitwardenSecret CRD with new annotations to trigger sync
 func PatchCRDAnnotation(ctx context.Context, name, namespace string, annotations map[string]string, dynamicClient dynamic.Interface) error {
 	if dynamicClient == nil {
@@ -212,6 +211,7 @@ func PatchCRDAnnotation(ctx context.Context, name, namespace string, annotations
 
 	// Try namespace-scoped first, then cluster-scoped
 	unstructuredObj, err := dynamicClient.Resource(BitwardenSecretGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+	isClusterScoped := false
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Try cluster-scoped
@@ -219,13 +219,13 @@ func PatchCRDAnnotation(ctx context.Context, name, namespace string, annotations
 			if err != nil {
 				return fmt.Errorf("failed to get CRD (tried namespace and cluster-scoped): %w", err)
 			}
-			// For cluster-scoped, patch without namespace
-			return patchCRDAnnotationClusterScoped(ctx, name, annotations, dynamicClient, unstructuredObj)
+			isClusterScoped = true
+		} else {
+			return fmt.Errorf("failed to get CRD: %w", err)
 		}
-		return fmt.Errorf("failed to get CRD: %w", err)
 	}
 
-	// Get current annotations
+	// Get and merge annotations
 	currentAnnotations, found, err := unstructured.NestedStringMap(unstructuredObj.Object, "metadata", "annotations")
 	if err != nil {
 		return fmt.Errorf("failed to get current annotations: %w", err)
@@ -252,59 +252,12 @@ func PatchCRDAnnotation(ctx context.Context, name, namespace string, annotations
 		return fmt.Errorf("failed to marshal patch: %w", err)
 	}
 
-	// Apply patch (namespace-scoped)
-	_, err = dynamicClient.Resource(BitwardenSecretGVR).Namespace(namespace).Patch(
-		ctx,
-		name,
-		types.MergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
-	)
-
-	if err != nil {
-		return fmt.Errorf("failed to patch CRD: %w", err)
+	// Apply patch (namespace-scoped or cluster-scoped)
+	if isClusterScoped {
+		_, err = dynamicClient.Resource(BitwardenSecretGVR).Patch(ctx, name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
+	} else {
+		_, err = dynamicClient.Resource(BitwardenSecretGVR).Namespace(namespace).Patch(ctx, name, types.MergePatchType, patchBytes, metav1.PatchOptions{})
 	}
-
-	return nil
-}
-
-// patchCRDAnnotationClusterScoped patches a cluster-scoped CRD
-func patchCRDAnnotationClusterScoped(ctx context.Context, name string, annotations map[string]string, dynamicClient dynamic.Interface, unstructuredObj *unstructured.Unstructured) error {
-	// Get current annotations
-	currentAnnotations, found, err := unstructured.NestedStringMap(unstructuredObj.Object, "metadata", "annotations")
-	if err != nil {
-		return fmt.Errorf("failed to get current annotations: %w", err)
-	}
-
-	if !found || currentAnnotations == nil {
-		currentAnnotations = make(map[string]string)
-	}
-
-	// Merge new annotations
-	for key, value := range annotations {
-		currentAnnotations[key] = value
-	}
-
-	// Create patch
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"annotations": currentAnnotations,
-		},
-	}
-
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("failed to marshal patch: %w", err)
-	}
-
-	// Apply patch (cluster-scoped, no namespace)
-	_, err = dynamicClient.Resource(BitwardenSecretGVR).Patch(
-		ctx,
-		name,
-		types.MergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
-	)
 
 	if err != nil {
 		return fmt.Errorf("failed to patch CRD: %w", err)

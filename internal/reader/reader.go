@@ -107,6 +107,8 @@ func readCRDInfo(ctx context.Context, crdName, namespace, secretName string, k8s
 
 	log.Printf("Reading CRD for secret %s (CRD name: %s, namespace: %s)", secretName, crdName, namespace)
 	crdInfo, err := k8s.GetBitwardenSecretCRD(ctx, crdName, namespace, k8sClients.DynamicClient)
+	// GetBitwardenSecretCRD always returns (info, nil), so err will always be nil
+	// but we check for safety in case the function signature changes
 	if err != nil {
 		log.Printf("ERROR: Failed to read CRD %s: %v", crdName, err)
 		secretInfo.SyncInfo.SyncMessage = fmt.Sprintf("Error reading CRD: %v", err)
@@ -114,6 +116,7 @@ func readCRDInfo(ctx context.Context, crdName, namespace, secretName string, k8s
 	}
 
 	log.Printf("CRD read result for %s: CRDFound=%v, SyncMessage=%s", crdName, crdInfo.CRDFound, crdInfo.SyncMessage)
+	// Copy CRD info to secret info (preserve K8sSecretSyncTime)
 	secretInfo.SyncInfo.CRDFound = crdInfo.CRDFound
 	secretInfo.SyncInfo.LastSuccessfulSync = crdInfo.LastSuccessfulSync
 	secretInfo.SyncInfo.SyncStatus = crdInfo.SyncStatus

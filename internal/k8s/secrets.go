@@ -34,14 +34,6 @@ func DecodeSecretData(data map[string][]byte) map[string]string {
 	return decoded
 }
 
-// GetSecretAnnotations extracts annotations from a secret
-func GetSecretAnnotations(secret *corev1.Secret) map[string]string {
-	if secret.Annotations == nil {
-		return make(map[string]string)
-	}
-	return secret.Annotations
-}
-
 // IsSecretNotFound checks if an error is a "not found" error
 func IsSecretNotFound(err error) bool {
 	return errors.IsNotFound(err)
