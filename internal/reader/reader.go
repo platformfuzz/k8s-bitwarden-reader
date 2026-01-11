@@ -3,6 +3,7 @@ package reader
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 
 	"bitwarden-reader/internal/k8s"
@@ -86,11 +87,25 @@ func ReadSecrets(ctx context.Context, secretNames []string, namespace string, k8
 		// If secret name starts with "bw-", get CRD info (remove "bw-" prefix)
 		if strings.HasPrefix(secretName, "bw-") {
 			crdName := strings.TrimPrefix(secretName, "bw-")
+
+			// Defensive check: ensure dynamic client is available
+			if k8sClients.DynamicClient == nil {
+				log.Printf("ERROR: DynamicClient is nil, cannot read CRD for secret %s", secretName)
+				secretInfo.SyncInfo.SyncMessage = "DynamicClient not initialized"
+				secrets = append(secrets, secretInfo)
+				continue
+			}
+
+			log.Printf("Attempting to read CRD: name=%s, namespace=%s, secret=%s", crdName, namespace, secretName)
+
 			crdInfo, err := k8s.GetBitwardenSecretCRD(ctx, crdName, namespace, k8sClients.DynamicClient)
 			if err != nil {
+				log.Printf("ERROR reading CRD %s in namespace %s: %v", crdName, namespace, err)
 				secretInfo.SyncInfo.SyncMessage = fmt.Sprintf("Error reading CRD: %v", err)
 				// Log error but don't fail the entire secret reading
 			} else {
+				log.Printf("CRD read result for %s: CRDFound=%v, LastSync=%s, Status=%s",
+					crdName, crdInfo.CRDFound, crdInfo.LastSuccessfulSync, crdInfo.SyncStatus)
 				secretInfo.SyncInfo.CRDFound = crdInfo.CRDFound
 				secretInfo.SyncInfo.LastSuccessfulSync = crdInfo.LastSuccessfulSync
 				secretInfo.SyncInfo.SyncStatus = crdInfo.SyncStatus
