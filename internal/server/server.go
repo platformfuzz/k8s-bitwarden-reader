@@ -95,8 +95,9 @@ func (s *Server) registerRoutes() {
 // Start starts the HTTP server
 func (s *Server) Start() error {
 	s.httpServer = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.config.Port),
-		Handler: s.router,
+		Addr:              fmt.Sprintf(":%d", s.config.Port),
+		Handler:           s.router,
+		ReadHeaderTimeout: 5 * time.Second, // Prevent Slowloris attacks
 	}
 
 	log.Printf("Starting server on port %d", s.config.Port)

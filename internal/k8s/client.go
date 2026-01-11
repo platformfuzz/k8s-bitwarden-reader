@@ -16,42 +16,50 @@ type K8sClients struct {
 	DynamicClient dynamic.Interface
 }
 
+// findKubeconfigFile checks if any kubeconfig file exists in the loading rules precedence
+func findKubeconfigFile(loadingRules *clientcmd.ClientConfigLoadingRules) bool {
+	if len(loadingRules.Precedence) == 0 {
+		return false
+	}
+	for _, path := range loadingRules.Precedence {
+		if path != "" {
+			if _, err := os.Stat(path); err == nil {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// buildKubeconfig builds a Kubernetes config from kubeconfig files
+func buildKubeconfig() (*rest.Config, error) {
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	if !findKubeconfigFile(loadingRules) {
+		return nil, nil // No kubeconfig found
+	}
+
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
+	config, err := clientConfig.ClientConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
+	}
+	return config, nil
+}
+
 // NewK8sClient creates Kubernetes clients with in-cluster config or kubeconfig fallback
 // Returns (nil, nil) if no Kubernetes config is found (standalone mode)
 func NewK8sClient() (*K8sClients, error) {
-	var config *rest.Config
-	var err error
-
 	// Try in-cluster config first (when running inside a Kubernetes cluster)
-	config, err = rest.InClusterConfig()
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		// Fallback to kubeconfig for local development
-		// Use default loading rules which handle KUBECONFIG env var and ~/.kube/config
-		loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
-
-		// Check if any kubeconfig file exists
-		found := false
-		if len(loadingRules.Precedence) > 0 {
-			for _, path := range loadingRules.Precedence {
-				if path != "" {
-					if _, statErr := os.Stat(path); statErr == nil {
-						found = true
-						break
-					}
-				}
-			}
+		config, err = buildKubeconfig()
+		if err != nil {
+			return nil, err
 		}
-
-		if !found {
+		if config == nil {
 			// No Kubernetes config found - return nil for standalone mode
 			return nil, nil
-		}
-
-		// Build config from kubeconfig
-		clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, &clientcmd.ConfigOverrides{})
-		config, err = clientConfig.ClientConfig()
-		if err != nil {
-			return nil, fmt.Errorf("failed to build kubeconfig: %w", err)
 		}
 	}
 
