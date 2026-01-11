@@ -89,6 +89,7 @@ func ReadSecrets(ctx context.Context, secretNames []string, namespace string, k8
 			crdInfo, err := k8s.GetBitwardenSecretCRD(ctx, crdName, namespace, k8sClients.DynamicClient)
 			if err != nil {
 				secretInfo.SyncInfo.SyncMessage = fmt.Sprintf("Error reading CRD: %v", err)
+				// Log error but don't fail the entire secret reading
 			} else {
 				secretInfo.SyncInfo.CRDFound = crdInfo.CRDFound
 				secretInfo.SyncInfo.LastSuccessfulSync = crdInfo.LastSuccessfulSync
