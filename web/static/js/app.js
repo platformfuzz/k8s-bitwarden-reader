@@ -130,20 +130,34 @@ function updateSecretKeys(card, secretName, keys) {
     const keysList = card.querySelector(`#keys-${secretName}`);
     if (!keysList) return;
 
-    // Clear existing keys
+    // ✅ Preserve current visibility state BEFORE clearing
+    const currentValues = keysList.querySelectorAll('.secret-value');
+    const isVisible = currentValues.length > 0 &&
+                     currentValues[0].style.display !== 'none';
+
     keysList.innerHTML = '';
 
-    // Add new keys
+    // Recreate with preserved state
     Object.entries(keys).forEach(([key, value]) => {
         const keyItem = document.createElement('div');
         keyItem.className = 'key-item';
         keyItem.innerHTML = `
             <strong>${escapeHtml(key)}:</strong>
-            <span class="secret-value" data-secret="${escapeHtml(secretName)}" data-key="${escapeHtml(key)}" style="display: none;">${escapeHtml(value)}</span>
-            <span class="secret-placeholder" data-secret="${escapeHtml(secretName)}" data-key="${escapeHtml(key)}">••••••••</span>
+            <span class="secret-value" data-secret="${escapeHtml(secretName)}"
+                  data-key="${escapeHtml(key)}"
+                  style="display: ${isVisible ? 'inline' : 'none'};">${escapeHtml(value)}</span>
+            <span class="secret-placeholder" data-secret="${escapeHtml(secretName)}"
+                  data-key="${escapeHtml(key)}"
+                  style="display: ${isVisible ? 'none' : 'inline'};">••••••••</span>
         `;
         keysList.appendChild(keyItem);
     });
+
+    // ✅ Also update button text to match state
+    const toggleBtn = card.querySelector('.btn-toggle');
+    if (toggleBtn) {
+        toggleBtn.textContent = isVisible ? 'Hide Values' : 'Show Values';
+    }
 }
 
 function escapeHtml(text) {
