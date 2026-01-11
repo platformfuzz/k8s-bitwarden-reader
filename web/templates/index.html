@@ -37,6 +37,7 @@
       <h2>Secrets ({{.TotalSecrets}} found)</h2>
       <div id="secrets-container">
         {{range .Secrets}}
+        {{$secretName := .Name}}
         <div class="secret-card" data-secret-name="{{.Name}}">
           <div class="secret-header">
             <h3>{{.Name}}</h3>
@@ -111,9 +112,9 @@
               {{range $key, $value := .Keys}}
               <div class="key-item">
                 <strong>{{$key}}:</strong>
-                <span class="secret-value" data-secret="{{$.Name}}" data-key="{{$key}}"
+                <span class="secret-value" data-secret="{{$secretName}}" data-key="{{$key}}"
                   style="display: none;">{{$value}}</span>
-                <span class="secret-placeholder" data-secret="{{$.Name}}" data-key="{{$key}}">••••••••</span>
+                <span class="secret-placeholder" data-secret="{{$secretName}}" data-key="{{$key}}">••••••••</span>
               </div>
               {{end}}
             </div>

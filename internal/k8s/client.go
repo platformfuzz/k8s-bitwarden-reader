@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"fmt"
+	"log"
 	"os"
 
 	"k8s.io/client-go/dynamic"
@@ -83,7 +84,7 @@ func NewK8sClient() (*K8sClients, error) {
 	}
 
 	// Log successful client creation
-	fmt.Printf("Successfully initialized Kubernetes clients (in-cluster: %v)\n", isInCluster)
+	log.Printf("Successfully initialized Kubernetes clients (in-cluster: %v)", isInCluster)
 
 	return &K8sClients{
 		Clientset:    clientset,

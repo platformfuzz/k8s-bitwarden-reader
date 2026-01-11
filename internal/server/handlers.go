@@ -27,16 +27,9 @@ func (s *Server) webHandler(c *gin.Context) {
 		return
 	}
 
-	totalFound := 0
-	for _, secret := range secrets {
-		if secret.Found {
-			totalFound++
-		}
-	}
-
 	c.HTML(http.StatusOK, "index.html", gin.H{
 		"Secrets":     secrets,
-		"TotalSecrets": totalFound,
+		"TotalSecrets": countFoundSecrets(secrets),
 		"PodName":     s.config.PodName,
 		"Namespace":   s.config.PodNamespace,
 		"AppTitle":    s.config.AppTitle,
@@ -56,17 +49,10 @@ func (s *Server) apiSecretsHandler(c *gin.Context) {
 		return
 	}
 
-	totalFound := 0
-	for _, secret := range secrets {
-		if secret.Found {
-			totalFound++
-		}
-	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"secrets":    secrets,
 		"namespace":  s.config.PodNamespace,
-		"totalFound": totalFound,
+		"totalFound": countFoundSecrets(secrets),
 		"timestamp":  time.Now().Format(time.RFC3339),
 	})
 }

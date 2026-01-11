@@ -14,6 +14,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// countFoundSecrets counts the number of found secrets
+func countFoundSecrets(secrets []reader.SecretInfo) int {
+	count := 0
+	for _, secret := range secrets {
+		if secret.Found {
+			count++
+		}
+	}
+	return count
+}
+
 // Server holds the HTTP server and its dependencies
 type Server struct {
 	router        *gin.Engine
@@ -131,17 +142,10 @@ func (s *Server) broadcastSecrets() {
 		log.Printf("Error reading secrets: %v", err)
 	}
 
-	totalFound := 0
-	for _, secret := range secrets {
-		if secret.Found {
-			totalFound++
-		}
-	}
-
 	message := map[string]interface{}{
 		"secrets":    secrets,
 		"namespace":  s.config.PodNamespace,
-		"totalFound": totalFound,
+		"totalFound": countFoundSecrets(secrets),
 		"timestamp":  time.Now().Format(time.RFC3339),
 	}
 
