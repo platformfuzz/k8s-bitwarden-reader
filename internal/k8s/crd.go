@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,14 +98,29 @@ func extractConditions(unstructuredObj *unstructured.Unstructured, info *CRDInfo
 }
 
 // GetBitwardenSecretCRD retrieves a BitwardenSecret CRD and extracts sync information
-// Tries namespace-scoped access first, then cluster-scoped if that fails
+// Always returns (info, nil) to ensure SyncMessage is set for error cases
 func GetBitwardenSecretCRD(ctx context.Context, name, namespace string, dynamicClient dynamic.Interface) (*CRDInfo, error) {
 	info := &CRDInfo{
 		CRDFound: false,
 	}
 
+	// Validate inputs
 	if dynamicClient == nil {
-		return nil, fmt.Errorf("dynamicClient is nil")
+		log.Printf("ERROR: DynamicClient is nil, cannot read CRD %s/%s", namespace, name)
+		info.SyncMessage = "DynamicClient not initialized"
+		return info, nil
+	}
+
+	if name == "" {
+		log.Printf("ERROR: CRD name is empty")
+		info.SyncMessage = "CRD name is empty"
+		return info, nil
+	}
+
+	if namespace == "" {
+		log.Printf("ERROR: Namespace is empty for CRD %s", name)
+		info.SyncMessage = "Namespace is empty"
+		return info, nil
 	}
 
 	log.Printf("Attempting to get CRD: group=%s, version=%s, resource=%s, name=%s, namespace=%s",
@@ -123,52 +139,69 @@ func GetBitwardenSecretCRD(ctx context.Context, name, namespace string, dynamicC
 		return info, nil
 	}
 
-	// Handle error - try cluster-scoped if namespace-scoped failed with "not found"
-	if !errors.IsNotFound(err) {
-		return handleCRDAccessError(err, name, namespace, dynamicClient, ctx)
-	}
+	// Log the full error details
+	errMsg := err.Error()
+	log.Printf("ERROR reading CRD %s/%s in namespace %s: %v (type: %T, message: %s)",
+		BitwardenSecretGVR.Group, name, namespace, err, err, errMsg)
 
-	// Try cluster-scoped access
-	log.Printf("CRD not found in namespace %s, trying cluster-scoped access", namespace)
-	unstructuredObj, err = dynamicClient.Resource(BitwardenSecretGVR).Get(ctx, name, metav1.GetOptions{})
-	if err == nil {
-		log.Printf("Successfully found CRD %s/%s using cluster-scoped access", BitwardenSecretGVR.Group, name)
-		info.CRDFound = true
-		extractMetadata(unstructuredObj, info)
-		extractStatusFields(unstructuredObj, info)
-		extractConditions(unstructuredObj, info)
-		log.Printf("Successfully read CRD %s/%s: CRDFound=%v, LastSync=%s, Status=%s",
-			BitwardenSecretGVR.Group, name, info.CRDFound, info.LastSuccessfulSync, info.SyncStatus)
+	// Check if it's a "not found" error (404)
+	if errors.IsNotFound(err) {
+		log.Printf("CRD not found (404): %s/%s in namespace %s, trying cluster-scoped access", BitwardenSecretGVR.Group, name, namespace)
+
+		// Try cluster-scoped access
+		unstructuredObj, err = dynamicClient.Resource(BitwardenSecretGVR).Get(ctx, name, metav1.GetOptions{})
+		if err == nil {
+			log.Printf("Successfully found CRD %s/%s using cluster-scoped access", BitwardenSecretGVR.Group, name)
+			info.CRDFound = true
+			extractMetadata(unstructuredObj, info)
+			extractStatusFields(unstructuredObj, info)
+			extractConditions(unstructuredObj, info)
+			log.Printf("Successfully read CRD %s/%s: CRDFound=%v, LastSync=%s, Status=%s",
+				BitwardenSecretGVR.Group, name, info.CRDFound, info.LastSuccessfulSync, info.SyncStatus)
+			return info, nil
+		}
+
+		// Cluster-scoped also failed
+		if errors.IsNotFound(err) {
+			log.Printf("CRD not found: %s/%s (tried namespace %s and cluster-scoped)", BitwardenSecretGVR.Group, name, namespace)
+			info.SyncMessage = fmt.Sprintf("CRD not found: %s", name)
+			return info, nil // CRD not found, but not an error
+		}
+
+		// Cluster-scoped failed with other error
+		log.Printf("Error reading CRD %s/%s (cluster-scoped): %v", BitwardenSecretGVR.Group, name, err)
+		info.SyncMessage = fmt.Sprintf("Failed to get CRD (cluster-scoped): %v", err)
 		return info, nil
 	}
 
-	// Cluster-scoped also failed
-	if errors.IsNotFound(err) {
-		log.Printf("CRD not found: %s/%s (tried namespace %s and cluster-scoped)", BitwardenSecretGVR.Group, name, namespace)
-		return info, nil // CRD not found, but not an error
-	}
+	// Check for "the server could not find the requested resource" error
+	// This is a generic error that can occur when API group isn't discovered
+	if strings.Contains(errMsg, "the server could not find the requested resource") ||
+		strings.Contains(errMsg, "could not find the requested resource") {
+		log.Printf("API resource discovery issue for %s/%s: %v", BitwardenSecretGVR.Group, name, err)
 
-	log.Printf("Error reading CRD %s/%s (cluster-scoped): %v", BitwardenSecretGVR.Group, name, err)
-	return nil, fmt.Errorf("failed to get CRD %s/%s: %w", BitwardenSecretGVR.Group, name, err)
-
-}
-
-// handleCRDAccessError handles errors when accessing CRD (non-404 errors)
-func handleCRDAccessError(err error, name, namespace string, dynamicClient dynamic.Interface, ctx context.Context) (*CRDInfo, error) {
-	log.Printf("Error reading CRD %s/%s in namespace %s: %v", BitwardenSecretGVR.Group, name, namespace, err)
-
-	// Check if it's an API discovery error
-	errMsg := err.Error()
-	if errors.IsNotFound(err) || errMsg == "the server could not find the requested resource" {
-		log.Printf("API resource not found - checking if CRD is registered. Error: %v", err)
 		// Try to list resources to verify API discovery
 		_, listErr := dynamicClient.Resource(BitwardenSecretGVR).Namespace(namespace).List(ctx, metav1.ListOptions{Limit: 1})
 		if listErr != nil {
 			log.Printf("API discovery check failed: %v", listErr)
 		}
+
+		info.SyncMessage = fmt.Sprintf("API resource not discoverable: %s. Error: %v", name, err)
+		return info, nil
 	}
 
-	return nil, fmt.Errorf("failed to get CRD %s/%s: %w", BitwardenSecretGVR.Group, name, err)
+	// Check for other API-related errors
+	if errors.IsMethodNotSupported(err) || errors.IsInvalid(err) {
+		log.Printf("API group/resource issue: %v", err)
+		info.SyncMessage = fmt.Sprintf("API group/resource issue: %v", err)
+		return info, nil
+	}
+
+	// For unexpected errors, still return info with message (don't fail completely)
+	errorMsg := fmt.Sprintf("Failed to get CRD: %v", err)
+	log.Printf("Unexpected error reading CRD %s/%s in namespace %s: %s", BitwardenSecretGVR.Group, name, namespace, errorMsg)
+	info.SyncMessage = errorMsg
+	return info, nil // Return info with error message, not an error
 }
 
 // PatchCRDAnnotation patches the BitwardenSecret CRD with new annotations to trigger sync
