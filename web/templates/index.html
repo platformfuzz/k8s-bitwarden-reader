@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{.AppTitle}} - {{.AppVersion}}</title>
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>{{.AppTitle}}</h1>
+      <p class="version">Version {{.AppVersion}}</p>
+    </header>
+
+    <div class="info-section">
+      <div class="info-card">
+        <h3>Pod Information</h3>
+        <p><strong>Pod Name:</strong> {{.PodName}}</p>
+        <p><strong>Namespace:</strong> {{.Namespace}}</p>
+      </div>
+      <div class="info-card">
+        <h3>Connection Status</h3>
+        <p id="ws-status">Connecting...</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="trigger-sync-btn" class="btn btn-primary">Trigger Sync</button>
+      <span id="sync-status"></span>
+    </div>
+
+    <div class="secrets-section">
+      <h2>Secrets ({{.TotalSecrets}} found)</h2>
+      <div id="secrets-container">
+        {{range .Secrets}}
+        <div class="secret-card" data-secret-name="{{.Name}}">
+          <div class="secret-header">
+            <h3>{{.Name}}</h3>
+            {{if .Found}}
+            <span class="status-badge status-found">Found</span>
+            {{else}}
+            <span class="status-badge status-not-found">Not Found</span>
+            {{end}}
+          </div>
+
+          {{if .Error}}
+          <div class="error-message">
+            <strong>Error:</strong> {{.Error}}
+          </div>
+          {{end}}
+
+          {{if .Found}}
+          <div class="sync-info">
+            <h4>Sync Information</h4>
+            <div class="sync-details">
+              <div class="sync-item">
+                <strong>CRD Found:</strong>
+                <span class="{{if .SyncInfo.CRDFound}}status-success{{else}}status-error{{end}}">
+                  {{if .SyncInfo.CRDFound}}Yes{{else}}No{{end}}
+                </span>
+              </div>
+              {{if .SyncInfo.LastSuccessfulSync}}
+              <div class="sync-item">
+                <strong>Last Successful Sync:</strong>
+                <span class="sync-time">{{.SyncInfo.LastSuccessfulSync}}</span>
+              </div>
+              {{end}}
+              {{if .SyncInfo.K8sSecretSyncTime}}
+              <div class="sync-item">
+                <strong>K8s Secret Sync Time:</strong>
+                <span class="sync-time">{{.SyncInfo.K8sSecretSyncTime}}</span>
+              </div>
+              {{end}}
+              {{if .SyncInfo.SyncStatus}}
+              <div class="sync-item">
+                <strong>Sync Status:</strong>
+                <span class="status-{{.SyncInfo.SyncStatus}}">{{.SyncInfo.SyncStatus}}</span>
+              </div>
+              {{end}}
+              {{if .SyncInfo.SyncReason}}
+              <div class="sync-item">
+                <strong>Sync Reason:</strong>
+                <span>{{.SyncInfo.SyncReason}}</span>
+              </div>
+              {{end}}
+              {{if .SyncInfo.SyncMessage}}
+              <div class="sync-item">
+                <strong>Sync Message:</strong>
+                <span>{{.SyncInfo.SyncMessage}}</span>
+              </div>
+              {{end}}
+              {{if .SyncInfo.CRDCreationTime}}
+              <div class="sync-item">
+                <strong>CRD Creation Time:</strong>
+                <span class="sync-time">{{.SyncInfo.CRDCreationTime}}</span>
+              </div>
+              {{end}}
+            </div>
+          </div>
+
+          <div class="secret-keys">
+            <div class="secret-keys-header">
+              <h4>Secret Keys</h4>
+              <button class="btn btn-toggle" onclick="toggleSecretValues('{{.Name}}')">Show Values</button>
+            </div>
+            <div class="keys-list" id="keys-{{.Name}}">
+              {{range $key, $value := .Keys}}
+              <div class="key-item">
+                <strong>{{$key}}:</strong>
+                <span class="secret-value" data-secret="{{$.Name}}" data-key="{{$key}}"
+                  style="display: none;">{{$value}}</span>
+                <span class="secret-placeholder" data-secret="{{$.Name}}" data-key="{{$key}}">••••••••</span>
+              </div>
+              {{end}}
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+
+</html>

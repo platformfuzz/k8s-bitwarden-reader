@@ -1,0 +1,75 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation (not needed in container)
+*.md
+docs/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# DevContainer (not needed for Docker build)
+.devcontainer/
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test files
+*_test.go
+tests/
+coverage.out
+coverage.html
+*.test
+
+# CI/CD
+.github/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+.directory
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Dependencies (will be downloaded in container)
+vendor/
+
+# Plan files and IDE configs
+.cursor/
+plans/
+*.plan
+
+# Build and development files
+Makefile
+LICENSE
+.dockerignore
+
+# Go workspace files
+go.work
+go.work.sum

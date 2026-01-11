@@ -1,0 +1,42 @@
+{
+  "name": "k8s-bitwarden-reader",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.go",
+        "ms-vscode.vscode-json",
+        "ms-azuretools.vscode-docker",
+        "redhat.vscode-yaml",
+        "ms-kubernetes-tools.vscode-kubernetes-tools"
+      ],
+      "settings": {
+        "go.toolsManagement.checkForUpdates": "local",
+        "go.useLanguageServer": true,
+        "go.gopath": "/home/vscode/go",
+        "go.goroot": "/usr/local/go"
+      }
+    }
+  },
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "k8s-bitwarden-reader",
+      "onAutoForward": "notify"
+    }
+  },
+  "containerEnv": {
+    "GOPATH": "/home/vscode/go",
+    "GOCACHE": "/home/vscode/.cache/go-build",
+    "GOMODCACHE": "/home/vscode/go/pkg/mod"
+  },
+  "postCreateCommand": "go mod download && go mod tidy",
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker-host.sock,type=bind"
+  ],
+  "runArgs": ["--privileged"]
+}
