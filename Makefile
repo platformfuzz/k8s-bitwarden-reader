@@ -120,4 +120,3 @@ help:
 	@echo "  lint           - Lint code"
 	@echo "  deps           - Download dependencies"
 	@echo "  help           - Show this help message"
-

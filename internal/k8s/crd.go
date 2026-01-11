@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -16,7 +17,7 @@ import (
 
 // BitwardenSecretGVR is the GroupVersionResource for BitwardenSecret CRD
 var BitwardenSecretGVR = schema.GroupVersionResource{
-	Group:    "bitwarden-secrets-operator.io",
+	Group:    "k8s.bitwarden.com",
 	Version:  "v1",
 	Resource: "bitwardensecrets",
 }
@@ -61,18 +62,32 @@ func extractConditionFields(conditionMap map[string]interface{}, info *CRDInfo) 
 // extractConditions extracts condition information from the CRD
 func extractConditions(unstructuredObj *unstructured.Unstructured, info *CRDInfo) {
 	conditions, found, err := unstructured.NestedSlice(unstructuredObj.Object, "status", "conditions")
-	if err != nil || !found {
+	if err != nil {
+		log.Printf("Error extracting conditions slice: %v", err)
+		return
+	}
+	if !found {
+		log.Printf("No conditions found in CRD status")
 		return
 	}
 
-	for _, condition := range conditions {
+	for i, condition := range conditions {
 		conditionMap, ok := condition.(map[string]interface{})
 		if !ok {
+			log.Printf("Condition %d is not a map[string]interface{}", i)
 			continue
 		}
 
 		conditionType, found, err := unstructured.NestedString(conditionMap, "type")
-		if err != nil || !found || conditionType != "SuccessfulSync" {
+		if err != nil {
+			log.Printf("Error extracting condition type: %v", err)
+			continue
+		}
+		if !found {
+			log.Printf("Condition %d has no type field", i)
+			continue
+		}
+		if conditionType != "SuccessfulSync" {
 			continue
 		}
 
@@ -91,15 +106,20 @@ func GetBitwardenSecretCRD(ctx context.Context, name, namespace string, dynamicC
 	unstructuredObj, err := dynamicClient.Resource(BitwardenSecretGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		if errors.IsNotFound(err) {
+			log.Printf("CRD not found: %s/%s in namespace %s", BitwardenSecretGVR.Group, name, namespace)
 			return info, nil // CRD not found, but not an error
 		}
-		return nil, err
+		log.Printf("Error reading CRD %s/%s in namespace %s: %v", BitwardenSecretGVR.Group, name, namespace, err)
+		return nil, fmt.Errorf("failed to get CRD %s/%s: %w", BitwardenSecretGVR.Group, name, err)
 	}
 
 	info.CRDFound = true
 	extractMetadata(unstructuredObj, info)
 	extractStatusFields(unstructuredObj, info)
 	extractConditions(unstructuredObj, info)
+
+	log.Printf("Successfully read CRD %s/%s: CRDFound=%v, LastSync=%s, Status=%s",
+		BitwardenSecretGVR.Group, name, info.CRDFound, info.LastSuccessfulSync, info.SyncStatus)
 
 	return info, nil
 }
@@ -158,7 +178,7 @@ func PatchCRDAnnotation(ctx context.Context, name, namespace string, annotations
 // TriggerSync patches the CRD with force-sync annotation
 func TriggerSync(ctx context.Context, name, namespace string, dynamicClient dynamic.Interface) error {
 	annotations := map[string]string{
-		"bitwarden-secrets-operator.io/force-sync": time.Now().Format(time.RFC3339),
+		"k8s.bitwarden.com/force-sync": time.Now().Format(time.RFC3339),
 	}
 	return PatchCRDAnnotation(ctx, name, namespace, annotations, dynamicClient)
 }
