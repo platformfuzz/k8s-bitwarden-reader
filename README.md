@@ -1,5 +1,7 @@
 # Bitwarden Reader
 
+![Build](https://github.com/platformfuzz/k8s-bitwarden-reader/actions/workflows/build-push.yml/badge.svg)
+
 A Go-based Kubernetes application for reading and displaying Bitwarden secrets synced to Kubernetes.
 
 ## Overview
@@ -28,7 +30,7 @@ Bitwarden Reader is a web application that reads and displays Bitwarden secrets 
 The application is configured via environment variables:
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+| -------- | ----------- | ------- |
 | `PORT` | HTTP server port | `8080` |
 | `POD_NAME` | Kubernetes pod name (from downward API) | - |
 | `POD_NAMESPACE` | Kubernetes namespace (from downward API) | - |
@@ -44,6 +46,7 @@ The application is configured via environment variables:
 
 1. Clone the repository
 2. Download dependencies:
+
    ```bash
    make deps
    ```
@@ -51,6 +54,7 @@ The application is configured via environment variables:
 ### Running Locally
 
 1. Set environment variables (optional):
+
    ```bash
    export POD_NAME=local-test
    export POD_NAMESPACE=default
@@ -58,12 +62,14 @@ The application is configured via environment variables:
    ```
 
 2. Build and run:
+
    ```bash
    make build
    ./bin/bitwarden-reader
    ```
 
    Or run directly:
+
    ```bash
    go run ./cmd/server
    ```
@@ -71,6 +77,7 @@ The application is configured via environment variables:
 3. Access the web UI at `http://localhost:8080`
 
 **Note**: The application can run without Kubernetes access in standalone mode. In this mode:
+
 - The web UI and API endpoints are still accessible
 - Secret reading will show error messages indicating Kubernetes is unavailable
 - Sync triggering will return 503 Service Unavailable
@@ -101,6 +108,7 @@ make docker-run
 ```
 
 Or manually:
+
 ```bash
 docker run -p 8080:8080 \
   -e POD_NAME=local-test \
@@ -118,6 +126,7 @@ docker run -p 8080:8080 \
 ### REST API
 
 - `GET /api/v1/secrets` - Get all secrets and sync information
+
   ```json
   {
     "secrets": [...],
@@ -128,6 +137,7 @@ docker run -p 8080:8080 \
   ```
 
 - `POST /api/v1/trigger-sync` - Trigger manual sync for secrets
+
   ```json
   {
     "secretNames": ["bw-secret1", "bw-secret2"]
@@ -135,6 +145,7 @@ docker run -p 8080:8080 \
   ```
 
 - `GET /api/v1/health` - Health check endpoint
+
   ```json
   {
     "status": "healthy",
@@ -148,7 +159,7 @@ docker run -p 8080:8080 \
 
 ## Project Structure
 
-```
+```plaintext
 .
 ├── cmd/server/           # Application entry point
 ├── internal/
@@ -207,11 +218,13 @@ env:
 ## Testing
 
 Run tests:
+
 ```bash
 make test
 ```
 
 Run code quality checks:
+
 ```bash
 make lint  # Lint code
 make fmt   # Format code

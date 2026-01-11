@@ -31,6 +31,56 @@ type CRDInfo struct {
 	CRDCreationTime       string
 }
 
+// extractMetadata extracts metadata fields from the CRD
+func extractMetadata(unstructuredObj *unstructured.Unstructured, info *CRDInfo) {
+	if creationTimestamp, found, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "creationTimestamp"); err == nil && found {
+		info.CRDCreationTime = creationTimestamp
+	}
+}
+
+// extractStatusFields extracts status fields from the CRD
+func extractStatusFields(unstructuredObj *unstructured.Unstructured, info *CRDInfo) {
+	if lastSync, found, err := unstructured.NestedString(unstructuredObj.Object, "status", "lastSuccessfulSyncTime"); err == nil && found {
+		info.LastSuccessfulSync = lastSync
+	}
+}
+
+// extractConditionFields extracts condition fields from a condition map
+func extractConditionFields(conditionMap map[string]interface{}, info *CRDInfo) {
+	if status, found, err := unstructured.NestedString(conditionMap, "status"); err == nil && found {
+		info.SyncStatus = status
+	}
+	if reason, found, err := unstructured.NestedString(conditionMap, "reason"); err == nil && found {
+		info.SyncReason = reason
+	}
+	if message, found, err := unstructured.NestedString(conditionMap, "message"); err == nil && found {
+		info.SyncMessage = message
+	}
+}
+
+// extractConditions extracts condition information from the CRD
+func extractConditions(unstructuredObj *unstructured.Unstructured, info *CRDInfo) {
+	conditions, found, err := unstructured.NestedSlice(unstructuredObj.Object, "status", "conditions")
+	if err != nil || !found {
+		return
+	}
+
+	for _, condition := range conditions {
+		conditionMap, ok := condition.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		conditionType, found, err := unstructured.NestedString(conditionMap, "type")
+		if err != nil || !found || conditionType != "SuccessfulSync" {
+			continue
+		}
+
+		extractConditionFields(conditionMap, info)
+		break // Found the SuccessfulSync condition
+	}
+}
+
 // GetBitwardenSecretCRD retrieves a BitwardenSecret CRD and extracts sync information
 func GetBitwardenSecretCRD(ctx context.Context, name, namespace string, dynamicClient dynamic.Interface) (*CRDInfo, error) {
 	info := &CRDInfo{
@@ -47,51 +97,9 @@ func GetBitwardenSecretCRD(ctx context.Context, name, namespace string, dynamicC
 	}
 
 	info.CRDFound = true
-
-	// Extract metadata.creationTimestamp
-	if creationTimestamp, found, err := unstructured.NestedString(unstructuredObj.Object, "metadata", "creationTimestamp"); err == nil && found {
-		info.CRDCreationTime = creationTimestamp
-	}
-
-	// Extract status.lastSuccessfulSyncTime
-	if lastSync, found, err := unstructured.NestedString(unstructuredObj.Object, "status", "lastSuccessfulSyncTime"); err == nil && found {
-		info.LastSuccessfulSync = lastSync
-	}
-
-	// Extract status.conditions array
-	conditions, found, err := unstructured.NestedSlice(unstructuredObj.Object, "status", "conditions")
-	if err == nil && found {
-		for _, condition := range conditions {
-			conditionMap, ok := condition.(map[string]interface{})
-			if !ok {
-				continue
-			}
-
-			// Check if this is a SuccessfulSync condition
-			conditionType, found, err := unstructured.NestedString(conditionMap, "type")
-			if err != nil || !found || conditionType != "SuccessfulSync" {
-				continue
-			}
-
-			// Extract status
-			if status, found, err := unstructured.NestedString(conditionMap, "status"); err == nil && found {
-				info.SyncStatus = status
-			}
-
-			// Extract reason
-			if reason, found, err := unstructured.NestedString(conditionMap, "reason"); err == nil && found {
-				info.SyncReason = reason
-			}
-
-			// Extract message
-			if message, found, err := unstructured.NestedString(conditionMap, "message"); err == nil && found {
-				info.SyncMessage = message
-			}
-
-			// Found the SuccessfulSync condition, break
-			break
-		}
-	}
+	extractMetadata(unstructuredObj, info)
+	extractStatusFields(unstructuredObj, info)
+	extractConditions(unstructuredObj, info)
 
 	return info, nil
 }
