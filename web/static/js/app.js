@@ -151,10 +151,10 @@ function updateSecretKeys(card, secretName, keys) {
                 <strong>${escapeHtml(key)}:</strong>
                 <span class="secret-value" data-secret="${escapeHtml(secretName)}"
                       data-key="${escapeHtml(key)}"
-                      style="display: ${isVisible ? 'inline' : 'none'};">${escapeHtml(value)}</span>
+                      style="display: ${isVisible ? 'inline-block' : 'none'}; visibility: ${isVisible ? 'visible' : 'hidden'};">${escapeHtml(value)}</span>
                 <span class="secret-placeholder" data-secret="${escapeHtml(secretName)}"
                       data-key="${escapeHtml(key)}"
-                      style="display: ${isVisible ? 'none' : 'inline'};">••••••••</span>
+                      style="display: ${isVisible ? 'none' : 'inline-block'}; visibility: ${isVisible ? 'hidden' : 'visible'};">••••••••</span>
             `;
             keysList.appendChild(keyItem);
         });
@@ -172,10 +172,10 @@ function updateSecretKeys(card, secretName, keys) {
                 <strong>${escapeHtml(key)}:</strong>
                 <span class="secret-value" data-secret="${escapeHtml(secretName)}"
                       data-key="${escapeHtml(key)}"
-                      style="display: ${isVisible ? 'inline' : 'none'};">${escapeHtml(value)}</span>
+                      style="display: ${isVisible ? 'inline-block' : 'none'}; visibility: ${isVisible ? 'visible' : 'hidden'};">${escapeHtml(value)}</span>
                 <span class="secret-placeholder" data-secret="${escapeHtml(secretName)}"
                       data-key="${escapeHtml(key)}"
-                      style="display: ${isVisible ? 'none' : 'inline'};">••••••••</span>
+                      style="display: ${isVisible ? 'none' : 'inline-block'}; visibility: ${isVisible ? 'hidden' : 'visible'};">••••••••</span>
             `;
             keysList.appendChild(keyItem);
         });
@@ -232,11 +232,13 @@ window.toggleSecretValues = function(secretName) {
     const newVisibilityState = !isVisible;
 
     values.forEach(el => {
-        el.style.display = newVisibilityState ? 'inline' : 'none';
+        el.style.display = newVisibilityState ? 'inline-block' : 'none';
+        el.style.visibility = newVisibilityState ? 'visible' : 'hidden';
     });
 
     placeholders.forEach(el => {
-        el.style.display = newVisibilityState ? 'none' : 'inline';
+        el.style.display = newVisibilityState ? 'none' : 'inline-block';
+        el.style.visibility = newVisibilityState ? 'hidden' : 'visible';
     });
 
     if (toggleBtn) {
