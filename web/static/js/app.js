@@ -175,21 +175,37 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Toggle secret values visibility
-function toggleSecretValues(secretName) {
+// Toggle secret values visibility - must be in global scope for onclick handlers
+window.toggleSecretValues = function(secretName) {
+    console.log('toggleSecretValues called with:', secretName);
+
     const card = document.querySelector(`[data-secret-name="${secretName}"]`);
-    if (!card) return;
+    if (!card) {
+        console.error('Card not found for secret:', secretName);
+        return;
+    }
 
     const values = card.querySelectorAll(`.secret-value[data-secret="${secretName}"]`);
     const placeholders = card.querySelectorAll(`.secret-placeholder[data-secret="${secretName}"]`);
     const toggleBtn = card.querySelector('.btn-toggle');
 
-    if (values.length === 0) return;
+    console.log('Found elements:', {
+        values: values.length,
+        placeholders: placeholders.length,
+        toggleBtn: !!toggleBtn
+    });
+
+    if (values.length === 0) {
+        console.error('No secret values found for:', secretName);
+        return;
+    }
 
     // Check if currently visible using computed style (same logic as updateSecretKeys)
     const firstValue = values[0];
     const computedStyle = window.getComputedStyle(firstValue);
     const isVisible = computedStyle.display !== 'none';
+
+    console.log('Current visibility state:', isVisible);
 
     // Toggle visibility
     values.forEach(el => {
@@ -203,6 +219,8 @@ function toggleSecretValues(secretName) {
     if (toggleBtn) {
         toggleBtn.textContent = isVisible ? 'Show Values' : 'Hide Values';
     }
+
+    console.log('Toggle complete. New state:', !isVisible ? 'visible' : 'hidden');
 }
 
 // Trigger sync functionality
