@@ -4,6 +4,9 @@ let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 let reconnectTimeout = null;
 
+// Track visibility state for each secret (persists across WebSocket updates)
+const secretVisibilityState = new Map();
+
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = `${protocol}//${window.location.host}/ws`;
@@ -130,18 +133,19 @@ function updateSecretKeys(card, secretName, keys) {
     const keysList = card.querySelector(`#keys-${secretName}`);
     if (!keysList) return;
 
-    // ✅ Preserve current visibility state BEFORE clearing
-    // Check if any value is currently visible (not 'none' and not empty string)
-    const currentValues = keysList.querySelectorAll('.secret-value');
-    const currentPlaceholders = keysList.querySelectorAll('.secret-placeholder');
-    let isVisible = false;
+    // ✅ Use stored visibility state (persists across WebSocket updates)
+    // If not stored, check current state, otherwise use stored state
+    let isVisible = secretVisibilityState.get(secretName) || false;
 
-    if (currentValues.length > 0) {
-        // Check computed style - this is the authoritative source
-        const firstValue = currentValues[0];
-        const computedStyle = window.getComputedStyle(firstValue);
-        // Visible if computed display is not 'none'
-        isVisible = computedStyle.display !== 'none';
+    // If state not stored, try to detect from current DOM
+    if (!secretVisibilityState.has(secretName)) {
+        const currentValues = keysList.querySelectorAll('.secret-value');
+        if (currentValues.length > 0) {
+            const firstValue = currentValues[0];
+            const computedStyle = window.getComputedStyle(firstValue);
+            isVisible = computedStyle.display !== 'none';
+            secretVisibilityState.set(secretName, isVisible);
+        }
     }
 
     keysList.innerHTML = '';
@@ -208,19 +212,25 @@ window.toggleSecretValues = function(secretName) {
     console.log('Current visibility state:', isVisible);
 
     // Toggle visibility
+    const newVisibilityState = !isVisible;
+
     values.forEach(el => {
-        el.style.display = isVisible ? 'none' : 'inline';
+        el.style.display = newVisibilityState ? 'inline' : 'none';
     });
 
     placeholders.forEach(el => {
-        el.style.display = isVisible ? 'inline' : 'none';
+        el.style.display = newVisibilityState ? 'none' : 'inline';
     });
 
     if (toggleBtn) {
-        toggleBtn.textContent = isVisible ? 'Show Values' : 'Hide Values';
+        toggleBtn.textContent = newVisibilityState ? 'Hide Values' : 'Show Values';
     }
 
-    console.log('Toggle complete. New state:', !isVisible ? 'visible' : 'hidden');
+    // ✅ Store the new state so it persists across WebSocket updates
+    secretVisibilityState.set(secretName, newVisibilityState);
+
+    console.log('Toggle complete. New state:', newVisibilityState ? 'visible' : 'hidden');
+    console.log('Stored state for', secretName, ':', newVisibilityState);
 }
 
 // Trigger sync functionality
