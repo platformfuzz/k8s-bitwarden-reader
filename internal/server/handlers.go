@@ -111,8 +111,6 @@ func (s *Server) triggerSyncHandler(c *gin.Context) {
 		return
 	}
 
-	s.broadcastSecrets()
-
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Sync triggered successfully",
 		"successes": successes,
