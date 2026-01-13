@@ -135,7 +135,27 @@ function updateSecretKeys(card, secretName, keys) {
     const existingItems = keysList.querySelectorAll('.key-item');
     const keysArray = Object.entries(keys);
 
-    if (existingItems.length !== keysArray.length) {
+    if (existingItems.length === 0) {
+        const isVisible = secretVisibilityState.get(secretName) || false;
+        keysArray.forEach(([key, value]) => {
+            const keyItem = document.createElement('div');
+            keyItem.className = 'key-item';
+            keyItem.innerHTML = `
+                <strong>${escapeHtml(key)}:</strong>
+                <span class="secret-value" data-secret="${escapeHtml(secretName)}"
+                      data-key="${escapeHtml(key)}"
+                      style="display: ${isVisible ? 'inline' : 'none'};">${escapeHtml(value)}</span>
+                <span class="secret-placeholder" data-secret="${escapeHtml(secretName)}"
+                      data-key="${escapeHtml(key)}"
+                      style="display: ${isVisible ? 'none' : 'inline'};">••••••••</span>
+            `;
+            keysList.appendChild(keyItem);
+        });
+        const toggleBtn = card.querySelector('.btn-toggle');
+        if (toggleBtn) {
+            toggleBtn.textContent = isVisible ? 'Hide Values' : 'Show Values';
+        }
+    } else if (existingItems.length !== keysArray.length) {
         const isVisible = secretVisibilityState.get(secretName) || false;
         keysList.innerHTML = '';
         keysArray.forEach(([key, value]) => {
