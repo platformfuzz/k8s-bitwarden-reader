@@ -94,6 +94,9 @@
                 <span>{{.SyncInfo.SyncMessage}}</span>
               </div>
               {{end}}
+              <div class="sync-item">
+                <button class="btn btn-sm btn-primary" onclick="triggerSyncForSecret('{{.Name}}')">Trigger Sync</button>
+              </div>
               {{if .SyncInfo.CRDCreationTime}}
               <div class="sync-item">
                 <strong>CRD Creation Time:</strong>
