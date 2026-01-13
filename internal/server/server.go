@@ -77,8 +77,7 @@ func NewServer(cfg *config.Config, k8sClients *k8s.K8sClients) *Server {
 	// Load HTML templates
 	server.router.LoadHTMLGlob("web/templates/*")
 
-	// Start broadcasting secrets periodically
-	go server.startBroadcasting()
+	// go server.startBroadcasting()
 
 	return server
 }

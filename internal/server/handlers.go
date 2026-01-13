@@ -94,12 +94,7 @@ func (s *Server) triggerSyncHandler(c *gin.Context) {
 			continue
 		}
 
-		// Only trigger sync for secrets starting with "bw-"
-		if !strings.HasPrefix(secretName, "bw-") {
-			continue
-		}
-
-		crdName := strings.TrimPrefix(secretName, "bw-")
+		crdName := secretName
 		err := k8s.TriggerSync(ctx, crdName, s.config.PodNamespace, s.k8sClients.DynamicClient)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("%s: %v", secretName, err))
@@ -115,6 +110,8 @@ func (s *Server) triggerSyncHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	s.broadcastSecrets()
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Sync triggered successfully",

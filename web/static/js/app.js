@@ -4,7 +4,6 @@ let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 let reconnectTimeout = null;
 
-// Track visibility state for each secret (persists across WebSocket updates)
 const secretVisibilityState = new Map();
 
 function connectWebSocket() {
@@ -133,43 +132,40 @@ function updateSecretKeys(card, secretName, keys) {
     const keysList = card.querySelector(`#keys-${secretName}`);
     if (!keysList) return;
 
-    // ✅ Use stored visibility state (persists across WebSocket updates)
-    // If not stored, check current state, otherwise use stored state
-    let isVisible = secretVisibilityState.get(secretName) || false;
+    const existingItems = keysList.querySelectorAll('.key-item');
+    const keysArray = Object.entries(keys);
 
-    // If state not stored, try to detect from current DOM
-    if (!secretVisibilityState.has(secretName)) {
-        const currentValues = keysList.querySelectorAll('.secret-value');
-        if (currentValues.length > 0) {
-            const firstValue = currentValues[0];
-            const computedStyle = window.getComputedStyle(firstValue);
-            isVisible = computedStyle.display !== 'none';
-            secretVisibilityState.set(secretName, isVisible);
+    if (existingItems.length !== keysArray.length) {
+        const isVisible = secretVisibilityState.get(secretName) || false;
+        keysList.innerHTML = '';
+        keysArray.forEach(([key, value]) => {
+            const keyItem = document.createElement('div');
+            keyItem.className = 'key-item';
+            keyItem.innerHTML = `
+                <strong>${escapeHtml(key)}:</strong>
+                <span class="secret-value" data-secret="${escapeHtml(secretName)}"
+                      data-key="${escapeHtml(key)}"
+                      style="display: ${isVisible ? 'inline' : 'none'};">${escapeHtml(value)}</span>
+                <span class="secret-placeholder" data-secret="${escapeHtml(secretName)}"
+                      data-key="${escapeHtml(key)}"
+                      style="display: ${isVisible ? 'none' : 'inline'};">••••••••</span>
+            `;
+            keysList.appendChild(keyItem);
+        });
+        const toggleBtn = card.querySelector('.btn-toggle');
+        if (toggleBtn) {
+            toggleBtn.textContent = isVisible ? 'Hide Values' : 'Show Values';
         }
-    }
-
-    keysList.innerHTML = '';
-
-    // Recreate with preserved state
-    Object.entries(keys).forEach(([key, value]) => {
-        const keyItem = document.createElement('div');
-        keyItem.className = 'key-item';
-        keyItem.innerHTML = `
-            <strong>${escapeHtml(key)}:</strong>
-            <span class="secret-value" data-secret="${escapeHtml(secretName)}"
-                  data-key="${escapeHtml(key)}"
-                  style="display: ${isVisible ? 'inline' : 'none'};">${escapeHtml(value)}</span>
-            <span class="secret-placeholder" data-secret="${escapeHtml(secretName)}"
-                  data-key="${escapeHtml(key)}"
-                  style="display: ${isVisible ? 'none' : 'inline'};">••••••••</span>
-        `;
-        keysList.appendChild(keyItem);
-    });
-
-    // ✅ Also update button text to match state
-    const toggleBtn = card.querySelector('.btn-toggle');
-    if (toggleBtn) {
-        toggleBtn.textContent = isVisible ? 'Hide Values' : 'Show Values';
+    } else {
+        keysArray.forEach(([key, value], index) => {
+            const keyItem = existingItems[index];
+            if (keyItem) {
+                const valueSpan = keyItem.querySelector('.secret-value');
+                if (valueSpan && valueSpan.textContent !== value) {
+                    valueSpan.textContent = value;
+                }
+            }
+        });
     }
 }
 
@@ -179,7 +175,6 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Toggle secret values visibility - must be in global scope for onclick handlers
 window.toggleSecretValues = function(secretName) {
     console.log('toggleSecretValues called with:', secretName);
 
@@ -204,14 +199,9 @@ window.toggleSecretValues = function(secretName) {
         return;
     }
 
-    // Check if currently visible using computed style (same logic as updateSecretKeys)
     const firstValue = values[0];
     const computedStyle = window.getComputedStyle(firstValue);
     const isVisible = computedStyle.display !== 'none';
-
-    console.log('Current visibility state:', isVisible);
-
-    // Toggle visibility
     const newVisibilityState = !isVisible;
 
     values.forEach(el => {
@@ -226,7 +216,6 @@ window.toggleSecretValues = function(secretName) {
         toggleBtn.textContent = newVisibilityState ? 'Hide Values' : 'Show Values';
     }
 
-    // ✅ Store the new state so it persists across WebSocket updates
     secretVisibilityState.set(secretName, newVisibilityState);
 
     console.log('Toggle complete. New state:', newVisibilityState ? 'visible' : 'hidden');
