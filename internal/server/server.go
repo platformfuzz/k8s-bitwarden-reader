@@ -77,8 +77,6 @@ func NewServer(cfg *config.Config, k8sClients *k8s.K8sClients) *Server {
 	// Load HTML templates
 	server.router.LoadHTMLGlob("web/templates/*")
 
-	// go server.startBroadcasting()
-
 	return server
 }
 
@@ -107,7 +105,7 @@ func (s *Server) Start() error {
 	s.httpServer = &http.Server{
 		Addr:              fmt.Sprintf(":%d", s.config.Port),
 		Handler:           s.router,
-		ReadHeaderTimeout: 5 * time.Second, // Prevent Slowloris attacks
+		ReadHeaderTimeout: 5 * time.Second,
 	}
 
 	log.Printf("Starting server on port %d", s.config.Port)
@@ -122,22 +120,11 @@ func (s *Server) Shutdown(ctx context.Context) error {
 	return nil
 }
 
-// startBroadcasting starts a goroutine that broadcasts secret updates periodically
-func (s *Server) startBroadcasting() {
-	ticker := time.NewTicker(s.config.DashboardRefreshInterval)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		s.broadcastSecrets()
-	}
-}
-
 // broadcastSecrets broadcasts current secret state to all WebSocket clients
 func (s *Server) broadcastSecrets() {
 	ctx := context.Background()
 	secrets, err := reader.ReadSecrets(ctx, s.config.SecretNames, s.config.PodNamespace, s.k8sClients)
 	if err != nil {
-		// Log error but still try to broadcast what we have
 		log.Printf("Error reading secrets: %v", err)
 	}
 
@@ -148,7 +135,6 @@ func (s *Server) broadcastSecrets() {
 		"timestamp":  time.Now().Format(time.RFC3339),
 	}
 
-	// Add error message if in standalone mode
 	if s.k8sClients == nil {
 		message["error"] = "Kubernetes client not available - running in standalone mode"
 	}

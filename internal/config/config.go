@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -44,6 +45,7 @@ func LoadConfig() *Config {
 	refreshInterval := getEnvAsInt("DASHBOARD_REFRESH_INTERVAL", 5)
 	cfg.DashboardRefreshInterval = time.Duration(refreshInterval) * time.Second
 
+	log.Printf("Config loaded: SecretNames=%v (len=%d)", cfg.SecretNames, len(cfg.SecretNames))
 	return cfg
 }
 
