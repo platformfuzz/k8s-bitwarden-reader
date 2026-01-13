@@ -131,9 +131,18 @@ function updateSecretKeys(card, secretName, keys) {
     if (!keysList) return;
 
     // ✅ Preserve current visibility state BEFORE clearing
+    // Check if any value is currently visible (not 'none' and not empty string)
     const currentValues = keysList.querySelectorAll('.secret-value');
-    const isVisible = currentValues.length > 0 &&
-                     currentValues[0].style.display !== 'none';
+    const currentPlaceholders = keysList.querySelectorAll('.secret-placeholder');
+    let isVisible = false;
+
+    if (currentValues.length > 0) {
+        // Check computed style - this is the authoritative source
+        const firstValue = currentValues[0];
+        const computedStyle = window.getComputedStyle(firstValue);
+        // Visible if computed display is not 'none'
+        isVisible = computedStyle.display !== 'none';
+    }
 
     keysList.innerHTML = '';
 
@@ -175,8 +184,14 @@ function toggleSecretValues(secretName) {
     const placeholders = card.querySelectorAll(`.secret-placeholder[data-secret="${secretName}"]`);
     const toggleBtn = card.querySelector('.btn-toggle');
 
-    const isVisible = values[0] && values[0].style.display !== 'none';
+    if (values.length === 0) return;
 
+    // Check if currently visible using computed style (same logic as updateSecretKeys)
+    const firstValue = values[0];
+    const computedStyle = window.getComputedStyle(firstValue);
+    const isVisible = computedStyle.display !== 'none';
+
+    // Toggle visibility
     values.forEach(el => {
         el.style.display = isVisible ? 'none' : 'inline';
     });
