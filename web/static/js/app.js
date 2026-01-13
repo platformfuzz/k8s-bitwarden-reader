@@ -12,31 +12,38 @@ function connectWebSocket() {
 
     updateConnectionStatus('connecting', 'Connecting...');
 
-    ws = new WebSocket(wsUrl);
+    try {
+        ws = new WebSocket(wsUrl);
 
-    ws.onopen = function() {
-        reconnectAttempts = 0;
-        updateConnectionStatus('connected', 'Connected');
-    };
+        ws.onopen = function() {
+            reconnectAttempts = 0;
+            updateConnectionStatus('connected', 'Connected');
+        };
 
-    ws.onclose = function() {
-        updateConnectionStatus('disconnected', 'Disconnected');
-        attemptReconnect();
-    };
+        ws.onclose = function() {
+            updateConnectionStatus('disconnected', 'Disconnected');
+            if (reconnectAttempts < maxReconnectAttempts) {
+                attemptReconnect();
+            } else {
+                updateConnectionStatus('disconnected', 'WebSocket unavailable - using manual refresh');
+            }
+        };
 
-    ws.onerror = function(error) {
-        console.error('WebSocket error:', error);
-        updateConnectionStatus('disconnected', 'Connection Error');
-    };
+        ws.onerror = function(error) {
+            updateConnectionStatus('disconnected', 'WebSocket unavailable - using manual refresh');
+        };
 
-    ws.onmessage = function(event) {
-        try {
-            const data = JSON.parse(event.data);
-            updateSecrets(data);
-        } catch (error) {
-            console.error('Error parsing WebSocket message:', error);
-        }
-    };
+        ws.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                updateSecrets(data);
+            } catch (error) {
+                console.error('Error parsing WebSocket message:', error);
+            }
+        };
+    } catch (error) {
+        updateConnectionStatus('disconnected', 'WebSocket unavailable - using manual refresh');
+    }
 }
 
 function updateConnectionStatus(status, message) {
@@ -268,8 +275,8 @@ async function triggerSync() {
             statusSpan.textContent = 'Sync triggered successfully';
             statusSpan.className = 'success';
 
-            // Poll for sync completion
-            pollSyncStatus();
+            // Refresh secrets data after sync
+            refreshSecrets();
         } else {
             statusSpan.textContent = `Error: ${data.error || 'Unknown error'}`;
             statusSpan.className = 'error';
@@ -288,35 +295,20 @@ async function triggerSync() {
     }
 }
 
-// Poll for sync completion
-async function pollSyncStatus() {
-    const maxPolls = 30; // Poll for up to 30 times
-    let pollCount = 0;
-
-    const pollInterval = setInterval(async () => {
-        pollCount++;
-
-        try {
-            const response = await fetch('/api/v1/secrets');
-            const data = await response.json();
-
-            // Check if sync is complete (this is a simplified check)
-            // In a real implementation, you'd check the sync status more carefully
-
-            if (pollCount >= maxPolls) {
-                clearInterval(pollInterval);
-            }
-        } catch (error) {
-            console.error('Error polling sync status:', error);
-            clearInterval(pollInterval);
-        }
-    }, 2000); // Poll every 2 seconds
+async function refreshSecrets() {
+    try {
+        const response = await fetch('/api/v1/secrets');
+        const data = await response.json();
+        updateSecrets(data);
+    } catch (error) {
+        console.error('Error refreshing secrets:', error);
+    }
 }
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    // Connect WebSocket
-    connectWebSocket();
+    // WebSocket not needed - use API calls instead
+    // connectWebSocket();
 
     // Setup trigger sync button
     const triggerBtn = document.getElementById('trigger-sync-btn');
