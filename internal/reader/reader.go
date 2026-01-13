@@ -84,11 +84,8 @@ func ReadSecrets(ctx context.Context, secretNames []string, namespace string, k8
 		// Extract sync-time annotation
 		secretInfo.SyncInfo.K8sSecretSyncTime = k8s.GetSecretSyncTime(secret)
 
-		// If secret name starts with "bw-", get CRD info (remove "bw-" prefix)
-		if strings.HasPrefix(secretName, "bw-") {
-			crdName := strings.TrimPrefix(secretName, "bw-")
-			readCRDInfo(ctx, crdName, namespace, secretName, k8sClients, &secretInfo)
-		}
+		// Always try to read CRD info using the secret name as the CRD name
+		readCRDInfo(ctx, secretName, namespace, secretName, k8sClients, &secretInfo)
 
 		secrets = append(secrets, secretInfo)
 	}
