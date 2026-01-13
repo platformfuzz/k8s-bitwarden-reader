@@ -44,3 +44,7 @@ temp/
 
 # Build artifacts
 dist/
+
+# Ignore compiled binaries
+server
+bin/

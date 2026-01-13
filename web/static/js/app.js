@@ -4,8 +4,8 @@ let reconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 let reconnectTimeout = null;
 
-// Track secrets whose visibility is controlled by user toggle
-const manuallyControlledSecrets = new Set();
+const secretVisibilityState = new Map();
+const secretHideTimeouts = new Map();
 
 function connectWebSocket() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -33,15 +33,7 @@ function connectWebSocket() {
   ws.onmessage = function (event) {
     try {
       const data = JSON.parse(event.data);
-      if (data.secrets) {
-        data.secrets = data.secrets.filter(s => !manuallyControlledSecrets.has(s.name));
-        if (data.secrets.length === 0) {
-          return;
-        }
-      }
-      if (data.secrets && data.secrets.length > 0) {
-        updateSecrets(data);
-      }
+      updateSecrets(data);
     } catch (error) {
       console.error('Error parsing WebSocket message:', error);
     }
@@ -70,7 +62,7 @@ function attemptReconnect() {
 
 // Update secrets display with new data
 function updateSecrets(data) {
-  if (!data.secrets || data.secrets.length === 0) return;
+  if (!data.secrets) return;
 
   const container = document.getElementById('secrets-container');
   if (!container) return;
@@ -126,8 +118,15 @@ function updateSecrets(data) {
 }
 
 function updateSyncInfo(card, syncInfo) {
-  // Sync info is primarily rendered server-side
-  // This function is a placeholder for future dynamic updates
+  const syncInfoDiv = card.querySelector('.sync-info');
+  if (!syncInfoDiv) return;
+
+  // Update CRD Found
+  const crdFound = syncInfoDiv.querySelector('.sync-item:has(strong:contains("CRD Found"))');
+  if (syncInfo.crdFound !== undefined) {
+    // This would need more sophisticated DOM manipulation
+    // For now, we'll rely on server-side rendering for initial load
+  }
 }
 
 function updateSecretKeys(card, secretName, keys) {
@@ -137,51 +136,34 @@ function updateSecretKeys(card, secretName, keys) {
   const existingItems = keysList.querySelectorAll('.key-item');
   const keysArray = Object.entries(keys);
 
-  // Preserve current visibility state when rebuilding
-  let currentVisibility = false;
-  if (existingItems.length > 0) {
-    const firstDisplay = existingItems[0].querySelector('.secret-display');
-    if (firstDisplay) {
-      currentVisibility = firstDisplay.getAttribute('data-hidden') !== 'true';
-    }
-  }
-
   if (existingItems.length !== keysArray.length) {
+    const isVisible = secretVisibilityState.get(secretName) || false;
     keysList.innerHTML = '';
     keysArray.forEach(([key, value]) => {
       const keyItem = document.createElement('div');
       keyItem.className = 'key-item';
-      const hiddenAttr = currentVisibility ? 'false' : 'true';
       keyItem.innerHTML = `
                 <strong>${escapeHtml(key)}:</strong>
-                <span class="secret-display" data-secret="${escapeHtml(secretName)}"
-                      data-key="${escapeHtml(key)}" data-value="${escapeHtml(value)}"
-                      data-hidden="${hiddenAttr}">
-                  <span class="secret-actual-value">${escapeHtml(value)}</span>
-                  <span class="secret-masked-value">••••••••</span>
-                </span>
+                <span class="secret-value" data-secret="${escapeHtml(secretName)}"
+                      data-key="${escapeHtml(key)}"
+                      style="display: ${isVisible ? 'inline' : 'none'};">${escapeHtml(value)}</span>
+                <span class="secret-placeholder" data-secret="${escapeHtml(secretName)}"
+                      data-key="${escapeHtml(key)}"
+                      style="display: ${isVisible ? 'none' : 'inline'};">••••••••</span>
             `;
       keysList.appendChild(keyItem);
     });
     const toggleBtn = card.querySelector('.btn-toggle');
     if (toggleBtn) {
-      toggleBtn.textContent = currentVisibility ? 'Hide Values' : 'Show Values';
+      toggleBtn.textContent = isVisible ? 'Hide Values' : 'Show Values';
     }
   } else {
     keysArray.forEach(([key, value], index) => {
       const keyItem = existingItems[index];
       if (keyItem) {
-        const displayEl = keyItem.querySelector('.secret-display');
-        if (displayEl) {
-          const currentValue = displayEl.getAttribute('data-value');
-          const actualValueSpan = displayEl.querySelector('.secret-actual-value');
-
-          if (currentValue !== escapeHtml(value)) {
-            displayEl.setAttribute('data-value', escapeHtml(value));
-            if (actualValueSpan) {
-              actualValueSpan.textContent = escapeHtml(value);
-            }
-          }
+        const valueSpan = keyItem.querySelector('.secret-value');
+        if (valueSpan && valueSpan.textContent !== value) {
+          valueSpan.textContent = value;
         }
       }
     });
@@ -195,55 +177,126 @@ function escapeHtml(text) {
 }
 
 window.toggleSecretValues = function (secretName) {
-  manuallyControlledSecrets.add(secretName);
+  console.log('toggleSecretValues called with:', secretName);
 
   const card = document.querySelector(`[data-secret-name="${secretName}"]`);
-  if (!card) return;
+  if (!card) {
+    console.error('Card not found for secret:', secretName);
+    return;
+  }
 
-  const keysList = card.querySelector(`#keys-${secretName}`);
-  if (!keysList) return;
-
-  const displays = keysList.querySelectorAll('.secret-display');
-  if (displays.length === 0) return;
-
+  const values = card.querySelectorAll(`.secret-value[data-secret="${secretName}"]`);
+  const placeholders = card.querySelectorAll(`.secret-placeholder[data-secret="${secretName}"]`);
   const toggleBtn = card.querySelector('.btn-toggle');
-  const firstDisplay = displays[0];
-  const isHidden = firstDisplay.getAttribute('data-hidden') === 'true';
-  const shouldShow = isHidden;
 
-  displays.forEach((el) => {
-    const actualSpan = el.querySelector('.secret-actual-value');
-    const maskedSpan = el.querySelector('.secret-masked-value');
+  console.log('Found elements:', {
+    values: values.length,
+    placeholders: placeholders.length,
+    toggleBtn: !!toggleBtn
+  });
 
-    if (shouldShow) {
-      el.setAttribute('data-hidden', 'false');
-      if (actualSpan) {
-        actualSpan.style.display = 'inline';
-        actualSpan.style.visibility = 'visible';
-      }
-      if (maskedSpan) {
-        maskedSpan.style.display = 'none';
-        maskedSpan.style.visibility = 'hidden';
-      }
-    } else {
-      el.setAttribute('data-hidden', 'true');
-      if (actualSpan) {
-        actualSpan.style.display = 'none';
-        actualSpan.style.visibility = 'hidden';
-      }
-      if (maskedSpan) {
-        maskedSpan.style.display = 'inline';
-        maskedSpan.style.visibility = 'visible';
-      }
-    }
+  if (values.length === 0) {
+    console.error('No secret values found for:', secretName);
+    return;
+  }
+
+  const firstValue = values[0];
+  const computedStyle = window.getComputedStyle(firstValue);
+  const isVisible = computedStyle.display !== 'none';
+  const newVisibilityState = !isVisible;
+
+  // Clear any existing timeout for this secret
+  if (secretHideTimeouts.has(secretName)) {
+    clearTimeout(secretHideTimeouts.get(secretName));
+    secretHideTimeouts.delete(secretName);
+  }
+
+  values.forEach(el => {
+    el.style.display = newVisibilityState ? 'inline' : 'none';
+  });
+
+  placeholders.forEach(el => {
+    el.style.display = newVisibilityState ? 'none' : 'inline';
   });
 
   if (toggleBtn) {
-    toggleBtn.textContent = shouldShow ? 'Hide Values' : 'Show Values';
+    toggleBtn.textContent = newVisibilityState ? 'Hide Values' : 'Show Values';
   }
+
+  secretVisibilityState.set(secretName, newVisibilityState);
+
+  // If showing values, set auto-hide after 1 minute
+  if (newVisibilityState) {
+    const timeoutId = setTimeout(() => {
+      // Hide the values
+      values.forEach(el => {
+        el.style.display = 'none';
+      });
+      placeholders.forEach(el => {
+        el.style.display = 'inline';
+      });
+
+      if (toggleBtn) {
+        toggleBtn.textContent = 'Show Values';
+      }
+
+      secretVisibilityState.set(secretName, false);
+      secretHideTimeouts.delete(secretName);
+    }, 60000); // 60 seconds
+
+    secretHideTimeouts.set(secretName, timeoutId);
+  }
+
+  console.log('Toggle complete. New state:', newVisibilityState ? 'visible' : 'hidden');
+  console.log('Stored state for', secretName, ':', newVisibilityState);
 }
 
 // Trigger sync functionality
+async function triggerSyncForSecret(secretName) {
+  const statusSpan = document.getElementById('sync-status');
+  if (statusSpan) {
+    statusSpan.textContent = `Triggering sync for ${secretName}...`;
+    statusSpan.className = '';
+  }
+
+  try {
+    const response = await fetch('/api/v1/trigger-sync', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ secretNames: [secretName] })
+    });
+
+    const data = await response.json();
+
+    if (response.ok) {
+      if (statusSpan) {
+        statusSpan.textContent = `Sync triggered for ${secretName}`;
+        statusSpan.className = 'success';
+      }
+      pollSyncStatus();
+    } else {
+      if (statusSpan) {
+        statusSpan.textContent = `Error: ${data.error || 'Unknown error'}`;
+        statusSpan.className = 'error';
+      }
+    }
+  } catch (error) {
+    if (statusSpan) {
+      statusSpan.textContent = `Error: ${error.message}`;
+      statusSpan.className = 'error';
+    }
+  } finally {
+    if (statusSpan) {
+      setTimeout(() => {
+        statusSpan.textContent = '';
+        statusSpan.className = '';
+      }, 5000);
+    }
+  }
+}
+
 async function triggerSync() {
   const btn = document.getElementById('trigger-sync-btn');
   const statusSpan = document.getElementById('sync-status');
@@ -251,7 +304,7 @@ async function triggerSync() {
   if (!btn || !statusSpan) return;
 
   btn.disabled = true;
-  statusSpan.textContent = 'Triggering sync...';
+  statusSpan.textContent = 'Triggering sync for all secrets...';
   statusSpan.className = '';
 
   try {
@@ -291,7 +344,7 @@ async function triggerSync() {
 
 // Poll for sync completion
 async function pollSyncStatus() {
-  const maxPolls = 30;
+  const maxPolls = 30; // Poll for up to 30 times
   let pollCount = 0;
 
   const pollInterval = setInterval(async () => {
@@ -299,7 +352,10 @@ async function pollSyncStatus() {
 
     try {
       const response = await fetch('/api/v1/secrets');
-      await response.json();
+      const data = await response.json();
+
+      // Check if sync is complete (this is a simplified check)
+      // In a real implementation, you'd check the sync status more carefully
 
       if (pollCount >= maxPolls) {
         clearInterval(pollInterval);
@@ -308,7 +364,7 @@ async function pollSyncStatus() {
       console.error('Error polling sync status:', error);
       clearInterval(pollInterval);
     }
-  }, 2000);
+  }, 2000); // Poll every 2 seconds
 }
 
 // Initialize on page load
@@ -321,6 +377,17 @@ document.addEventListener('DOMContentLoaded', function () {
   if (triggerBtn) {
     triggerBtn.addEventListener('click', triggerSync);
   }
+
+  // Setup toggle buttons for each secret
+  document.querySelectorAll('.btn-toggle').forEach(btn => {
+    btn.addEventListener('click', function () {
+      const secretCard = this.closest('.secret-card');
+      if (secretCard) {
+        const secretName = secretCard.getAttribute('data-secret-name');
+        toggleSecretValues(secretName);
+      }
+    });
+  });
 });
 
 // Cleanup on page unload
