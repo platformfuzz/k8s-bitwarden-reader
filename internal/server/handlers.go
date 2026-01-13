@@ -76,11 +76,9 @@ func (s *Server) triggerSyncHandler(c *gin.Context) {
 
 	var req triggerSyncRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		// If no body provided, use all secrets from config
 		req.SecretNames = s.config.SecretNames
 	}
 
-	// If no secret names in request, use config
 	if len(req.SecretNames) == 0 {
 		req.SecretNames = s.config.SecretNames
 	}
@@ -110,6 +108,8 @@ func (s *Server) triggerSyncHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	s.broadcastSecrets()
 
 	c.JSON(http.StatusOK, gin.H{
 		"message":   "Sync triggered successfully",

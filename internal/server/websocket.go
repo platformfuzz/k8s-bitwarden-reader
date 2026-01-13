@@ -257,7 +257,6 @@ func (s *Server) wsHandler(c *gin.Context) {
 
 	client.hub.register <- client
 
-	// Allow collection of memory referenced by the caller by doing all work in new goroutines
 	go client.writePump()
 	go client.readPump()
 }

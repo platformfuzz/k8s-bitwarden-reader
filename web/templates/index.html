@@ -112,9 +112,11 @@
               {{range $key, $value := .Keys}}
               <div class="key-item">
                 <strong>{{$key}}:</strong>
-                <span class="secret-value" data-secret="{{$secretName}}" data-key="{{$key}}"
-                  style="display: none;">{{$value}}</span>
-                <span class="secret-placeholder" data-secret="{{$secretName}}" data-key="{{$key}}">••••••••</span>
+                <span class="secret-display" data-secret="{{$secretName}}" data-key="{{$key}}" data-value="{{$value}}"
+                  data-hidden="true">
+                  <span class="secret-actual-value">{{$value}}</span>
+                  <span class="secret-masked-value">••••••••</span>
+                </span>
               </div>
               {{end}}
             </div>
