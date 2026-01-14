@@ -209,7 +209,7 @@ window.toggleSecretValues = function(secretName) {
     }
 
     const isHidden = firstDisplay.getAttribute('data-hidden') === 'true';
-    const willBeVisible = !isHidden;
+    const willBeVisible = isHidden;
 
     displays.forEach(display => {
         display.setAttribute('data-hidden', willBeVisible ? 'false' : 'true');
