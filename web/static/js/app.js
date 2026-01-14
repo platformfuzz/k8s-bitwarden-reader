@@ -1,3 +1,6 @@
+// Debug mode - set to false in production
+const DEBUG_MODE = false;
+
 // WebSocket connection management
 let ws = null;
 let reconnectAttempts = 0;
@@ -179,7 +182,7 @@ function escapeHtml(text) {
 }
 
 window.toggleSecretValues = function(secretName) {
-    console.log('toggleSecretValues called with:', secretName);
+    if (DEBUG_MODE) console.log('toggleSecretValues called with:', secretName);
 
     const card = document.querySelector(`[data-secret-name="${secretName}"]`);
     if (!card) {
@@ -190,10 +193,12 @@ window.toggleSecretValues = function(secretName) {
     const displays = card.querySelectorAll(`.secret-display[data-secret="${secretName}"]`);
     const toggleBtn = card.querySelector('.btn-toggle');
 
-    console.log('Found elements:', {
-        displays: displays.length,
-        toggleBtn: !!toggleBtn
-    });
+    if (DEBUG_MODE) {
+        console.log('Found elements:', {
+            displays: displays.length,
+            toggleBtn: !!toggleBtn
+        });
+    }
 
     if (displays.length === 0) {
         console.error('No secret displays found for:', secretName);
@@ -237,8 +242,10 @@ window.toggleSecretValues = function(secretName) {
         autoHideTimeouts.set(secretName, timeoutId);
     }
 
-    console.log('Toggle complete. New state:', willBeVisible ? 'visible' : 'hidden');
-    console.log('Stored state for', secretName, ':', willBeVisible);
+    if (DEBUG_MODE) {
+        console.log('Toggle complete. New state:', willBeVisible ? 'visible' : 'hidden');
+        console.log('Stored state for', secretName, ':', willBeVisible);
+    }
 }
 
 // Trigger sync functionality
