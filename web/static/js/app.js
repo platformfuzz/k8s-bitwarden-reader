@@ -209,20 +209,20 @@ window.toggleSecretValues = function(secretName) {
     }
 
     const isHidden = firstDisplay.getAttribute('data-hidden') === 'true';
-    const newVisibilityState = isHidden;
+    const willBeVisible = !isHidden;
 
     displays.forEach(display => {
-        display.setAttribute('data-hidden', newVisibilityState ? 'false' : 'true');
+        display.setAttribute('data-hidden', willBeVisible ? 'false' : 'true');
     });
 
     if (toggleBtn) {
-        toggleBtn.textContent = newVisibilityState ? 'Hide Values' : 'Show Values';
+        toggleBtn.textContent = willBeVisible ? 'Hide Values' : 'Show Values';
     }
 
-    secretVisibilityState.set(secretName, newVisibilityState);
+    secretVisibilityState.set(secretName, willBeVisible);
 
-    console.log('Toggle complete. New state:', newVisibilityState ? 'visible' : 'hidden');
-    console.log('Stored state for', secretName, ':', newVisibilityState);
+    console.log('Toggle complete. New state:', willBeVisible ? 'visible' : 'hidden');
+    console.log('Stored state for', secretName, ':', willBeVisible);
 }
 
 // Trigger sync functionality
