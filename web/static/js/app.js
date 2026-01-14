@@ -143,9 +143,9 @@ function updateSecretKeys(card, secretName, keys) {
             keyItem.className = 'key-item';
             keyItem.innerHTML = `
                 <strong>${escapeHtml(key)}:</strong>
-                <span class="secret-display" data-secret="${escapeHtml(secretName)}" data-key="${escapeHtml(key)}" data-value="${escapeHtml(value)}" data-hidden="${!isVisible}">
-                    <span class="secret-actual-value" style="display: ${isVisible ? 'inline' : 'none'};">${escapeHtml(value)}</span>
-                    <span class="secret-masked-value" style="display: ${isVisible ? 'none' : 'inline'};">••••••••</span>
+                <span class="secret-display" data-secret="${escapeHtml(secretName)}" data-key="${escapeHtml(key)}" data-value="${escapeHtml(value)}" data-hidden="${isVisible ? 'false' : 'true'}">
+                    <span class="secret-actual-value">${escapeHtml(value)}</span>
+                    <span class="secret-masked-value">••••••••</span>
                 </span>
             `;
             keysList.appendChild(keyItem);
@@ -208,17 +208,11 @@ window.toggleSecretValues = function(secretName) {
         return;
     }
 
-    const computedStyle = window.getComputedStyle(actualValue);
-    const isVisible = computedStyle.display !== 'none';
-    const newVisibilityState = !isVisible;
+    const isHidden = firstDisplay.getAttribute('data-hidden') === 'true';
+    const newVisibilityState = isHidden;
 
     displays.forEach(display => {
-        const actual = display.querySelector('.secret-actual-value');
-        const masked = display.querySelector('.secret-masked-value');
-        if (actual && masked) {
-            actual.style.display = newVisibilityState ? 'inline' : 'none';
-            masked.style.display = newVisibilityState ? 'none' : 'inline';
-        }
+        display.setAttribute('data-hidden', newVisibilityState ? 'false' : 'true');
     });
 
     if (toggleBtn) {
