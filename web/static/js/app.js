@@ -351,17 +351,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if (triggerBtn) {
         triggerBtn.addEventListener('click', triggerSync);
     }
-
-    // Setup toggle buttons for each secret
-    document.querySelectorAll('.btn-toggle').forEach(btn => {
-        btn.addEventListener('click', function() {
-            const secretCard = this.closest('.secret-card');
-            if (secretCard) {
-                const secretName = secretCard.getAttribute('data-secret-name');
-                toggleSecretValues(secretName);
-            }
-        });
-    });
 });
 
 // Cleanup on page unload
