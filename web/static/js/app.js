@@ -5,6 +5,7 @@ const maxReconnectAttempts = 5;
 let reconnectTimeout = null;
 
 const secretVisibilityState = new Map();
+const autoHideTimeouts = new Map();
 
 function connectWebSocket() {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -220,6 +221,21 @@ window.toggleSecretValues = function(secretName) {
     }
 
     secretVisibilityState.set(secretName, willBeVisible);
+
+    // Clear any existing auto-hide timeout
+    if (autoHideTimeouts.has(secretName)) {
+        clearTimeout(autoHideTimeouts.get(secretName));
+        autoHideTimeouts.delete(secretName);
+    }
+
+    // If showing values, set auto-hide after 60 seconds
+    if (willBeVisible) {
+        const timeoutId = setTimeout(() => {
+            toggleSecretValues(secretName);
+            autoHideTimeouts.delete(secretName);
+        }, 60000);
+        autoHideTimeouts.set(secretName, timeoutId);
+    }
 
     console.log('Toggle complete. New state:', willBeVisible ? 'visible' : 'hidden');
     console.log('Stored state for', secretName, ':', willBeVisible);
