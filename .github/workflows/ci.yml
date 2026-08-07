@@ -19,7 +19,7 @@ jobs:
     uses: actionsforge/actions-govulncheck/.github/workflows/govulncheck.yml@v0.0.9
 
   test:
-    uses: actionsforge/actions-go-test/.github/workflows/go-test.yml@v0.0.8
+    uses: actionsforge/actions-go-test/.github/workflows/go-test.yml@v0.0.9
     with:
       test-pattern: "./..."
 
